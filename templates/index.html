@@ -5,50 +5,181 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Java to Python Transpiler</title>
     <style>
-        body { font-family: sans-serif; background-color: #f4f4f9; color: #333; line-height: 1.6; }
-        .container { max-width: 600px; margin: 50px auto; padding: 30px; background: #fff; border-radius: 8px; box-shadow: 0 0 15px rgba(0,0,0,0.1); }
-        h1 { text-align: center; color: #444; }
-        .upload-form { display: flex; flex-direction: column; align-items: center; }
-        input[type="file"] { border: 1px solid #ddd; padding: 10px; border-radius: 5px; margin-bottom: 20px; width: 100%; }
-        button { background-color: #007bff; color: white; padding: 12px 25px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; transition: background-color 0.3s; margin-top: 10px; }
-        button:hover { background-color: #0056b3; }
-        .loading { display: none; text-align: center; font-size: 18px; color: #555; }
-        .choice-container { margin-bottom: 20px; text-align: center; }
-        .choice-container label { margin: 0 15px; font-size: 16px; }
+        /* General Body & Theme */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            color: #343a40;
+            margin: 0;
+            line-height: 1.6;
+        }
+
+        /* Header */
+        .header {
+            background-color: #ffffff;
+            padding: 15px 30px;
+            display: flex;
+            align-items: center;
+            border-bottom: 3px solid #a11a1b;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .logo {
+            height: 100px;
+            margin-right: 20px;
+        }
+        .header h1 {
+            color: #a11a1b;
+            margin: 0;
+            font-size: 1.8em;
+            font-weight: 600;
+        }
+
+        /* Main Container */
+        .container {
+            max-width: 700px;
+            margin: 50px auto;
+            padding: 40px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.08);
+        }
+
+        /* Form Elements */
+        .upload-section h2 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-weight: 500;
+        }
+
+        .choice-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .choice-container label {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            background-color: #f9f9f9;
+            transition: background-color 0.3s;
+            font-weight: 500;
+            color: #555;
+        }
+        .choice-container input[type="radio"] {
+            display: none;
+        }
+        .choice-container input[type="radio"]:checked + label {
+            background-color: #a11a1b;
+            color: white;
+        }
+
+        .upload-form {
+            display: none; /* Hidden by default, shown by JS */
+            flex-direction: column;
+            align-items: center;
+        }
+        .upload-form.active {
+            display: flex;
+        }
+        .upload-form label {
+            font-weight: 500;
+            margin-bottom: 15px;
+            color: #444;
+        }
+        input[type="file"] {
+            border: 2px dashed #ddd;
+            padding: 30px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            width: 100%;
+            text-align: center;
+            background-color: #fdfdfd;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+        input[type="file"]:hover {
+            border-color: #a11a1b;
+        }
+        button {
+            background-color: #a11a1b;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: background-color 0.3s, transform 0.2s;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #801516;
+            transform: translateY(-2px);
+        }
+
+        /* Loading Spinner */
+        .loading {
+            display: none;
+            text-align: center;
+        }
+        .spinner {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #a11a1b;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
+    <header class="header">
+        <img src="../static/LogoUM.png" alt="University Logo" class="logo">
+        <h1>Java to Python Transpiler</h1>
+    </header>
+
     <div class="container">
-        <h1>Java to Python AST Transpiler</h1>
-        
-        <!-- NEW: Radio buttons to choose input type -->
-        <div class="choice-container">
-            <label>
-                <input type="radio" name="upload_type" value="file" checked> Single File
-            </label>
-            <label>
-                <input type="radio" name="upload_type" value="project"> Project (.zip)
-            </label>
-        </div>
+        <div class="upload-section">
+            <h2>Select Translation Type</h2>
+            
+            <div class="choice-container">
+                <input type="radio" name="upload_type" value="file" id="type_file" checked>
+                <label for="type_file">Single File</label>
+                
+                <input type="radio" name="upload_type" value="project" id="type_project">
+                <label for="type_project">Project (.zip)</label>
+            </div>
 
-        <!-- Single File Form -->
-        <form id="file-form" class="upload-form" action="/transpile" method="post" enctype="multipart/form-data">
-            <input type="hidden" name="form_type" value="file">
-            <label for="java_file">Select a .java file to transpile:</label>
-            <input type="file" name="java_file" id="java_file" accept=".java" required>
-            <button type="submit">Transpile File</button>
-        </form>
+            <!-- Single File Form -->
+            <form id="file-form" class="upload-form active" action="/transpile" method="post" enctype="multipart/form-data">
+                <input type="hidden" name="form_type" value="file">
+                <label for="java_file">Select a .java file to transpile</label>
+                <input type="file" name="java_file" id="java_file" accept=".java" required>
+                <button type="submit">Transpile File</button>
+            </form>
 
-        <!-- Project ZIP Form (initially hidden) -->
-        <form id="project-form" class="upload-form" action="/transpile" method="post" enctype="multipart/form-data" style="display:none;">
-            <input type="hidden" name="form_type" value="project">
-            <label for="project_file">Select a .zip file containing your Java project:</label>
-            <input type="file" name="project_file" id="project_file" accept=".zip" required>
-            <button type="submit">Transpile Project</button>
-        </form>
+            <!-- Project ZIP Form -->
+            <form id="project-form" class="upload-form" action="/transpile" method="post" enctype="multipart/form-data">
+                <input type="hidden" name="form_type" value="project">
+                <label for="project_file">Select a .zip file of your Java project</label>
+                <input type="file" name="project_file" id="project_file" accept=".zip" required>
+                <button type="submit">Transpile Project</button>
+            </form>
 
-        <div id="loading-message" class="loading">
-            <p>Processing... This may take a moment.</p>
+            <div id="loading-message" class="loading">
+                <div class="spinner"></div>
+                <p>Processing your request... This may take a moment.</p>
+            </div>
         </div>
     </div>
 
@@ -56,11 +187,13 @@
         const fileForm = document.getElementById('file-form');
         const projectForm = document.getElementById('project-form');
         const loadingMessage = document.getElementById('loading-message');
+        const choiceContainer = document.querySelector('.choice-container');
 
         // Function to show the loading message and hide forms
         function showLoading() {
             fileForm.style.display = 'none';
             projectForm.style.display = 'none';
+            choiceContainer.style.display = 'none';
             loadingMessage.style.display = 'block';
         }
         
@@ -72,14 +205,13 @@
         document.querySelectorAll('input[name="upload_type"]').forEach(radio => {
             radio.addEventListener('change', function() {
                 if (this.value === 'file') {
-                    fileForm.style.display = 'flex';
-                    projectForm.style.display = 'none';
+                    fileForm.classList.add('active');
+                    projectForm.classList.remove('active');
                 } else {
-                    fileForm.style.display = 'none';
-                    projectForm.style.display = 'flex';
+                    fileForm.classList.remove('active');
+                    projectForm.classList.add('active');
                 }
             });
         });
     </script>
 </body>
-</html>

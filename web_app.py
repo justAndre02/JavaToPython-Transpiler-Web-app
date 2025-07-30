@@ -66,7 +66,7 @@ def handle_single_file_upload(req, request_id, upload_dir, output_dir):
         return redirect(url_for('index'))
 
     if allowed_file(file.filename, {'java'}):
-        filename = "Source.java"  # Using a generic name for the input
+        filename = secure_filename(file.filename)
         file_path = os.path.join(upload_dir, filename)
         file.save(file_path)
 
@@ -76,7 +76,10 @@ def handle_single_file_upload(req, request_id, upload_dir, output_dir):
             return render_template('result.html', error="Translation failed to produce a result.")
         
         _, log_path, error = translation_result
-        output_py_path = os.path.join(output_dir, "Source.py") # The output file name is now predictable
+        
+        # Determine the output path based on the original filename
+        base_filename, _ = os.path.splitext(filename)
+        output_py_path = os.path.join(output_dir, f"{base_filename}.py")
 
         if error:
             return render_template('result.html', error=error)
