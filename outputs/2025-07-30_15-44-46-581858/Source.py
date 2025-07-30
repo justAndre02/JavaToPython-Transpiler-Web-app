@@ -1,0 +1,28 @@
+# Unit test result: ❌ FAILED (see log for details)
+import math
+
+class PrimeChecker:
+
+    @staticmethod
+    def main(args: list[str]):
+        checker = PrimeChecker()
+        numbers = [2, 4, 5, 9, 13, 17, 20]
+        for num in numbers:
+            if checker.isPrime(num):
+                print(f'{num} é primo.')
+            else:
+                print(f'{num} não é primo.')
+
+    def isPrime(self, n: int) -> bool:
+        if n <= 1:
+            return False
+        if n == 2:
+            return True
+        if n % 2 == 0:
+            return False
+        for i in range(3, int(math.sqrt(n)) + 1, 2):
+            if n % i == 0:
+                return False
+        return True
+if __name__ == '__main__':
+    PrimeChecker.main([])

@@ -5,3 +5,5 @@ In order to use this application the user needs a Google API key. So before usin
 
 In order to get the api key, Google offers without cost the API key to everibody in the following site:
 https://aistudio.google.com/apikey
+
+If all these requirements just run **python webapp.py** and the acess http://127.0.0.1:5000

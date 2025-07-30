@@ -24,7 +24,7 @@ except ImportError:
 
 # --- Configuração ---
 GEMINI_MODEL_NAME = "gemini-2.5-flash" # Using a modern, capable model
-MAX_MEMBERS_PER_CHUNK = 10 # Adjusted for potentially larger files
+MAX_MEMBERS_PER_CHUNK = 30 # Adjusted for potentially larger files
 
 # --- Framework Identification Helpers ---
 def find_nodes_by_type(node, node_type):
@@ -870,6 +870,14 @@ def get_python_source_root(java_file_path, input_root_path, output_root_dir, ast
     Calculates the Python source root directory needed for PYTHONPATH.
     This allows tests to correctly import other modules from the translated project.
     """
+    # For single file uploads, the java_file_path is inside a unique request folder (e.g., uploads/request_id/Source.java)
+    # and the input_root_path is the parent 'uploads' folder. The output is in 'outputs/request_id'.
+    # In this scenario, the python source root should simply be the output directory for the request.
+    if os.path.basename(input_root_path) in ['uploads', 'outputs']:
+         # Heuristic for web app single-file mode
+        if os.path.dirname(java_file_path) != input_root_path:
+            return output_root_dir
+
     package_decl = find_nodes_by_type(ast_dictionary, "PackageDeclaration")
     package_path = ""
     if package_decl:
@@ -935,8 +943,7 @@ def generate_and_run_unit_tests(model, all_python_module_body_parts, original_ja
 
     overall_success = True
     
-    # --- NEW: Define the temporary file path for the code being tested ---
-    temp_subject_filename = os.path.join(output_root_dir, "temp_subject_for_test.py")
+    # --- The temporary subject file is no longer needed ---
 
     for func_info in testable_functions:
         func_name = func_info['name']
@@ -970,9 +977,9 @@ Write a Python script using the built-in unittest framework to test the {qualifi
 
 Requirements:
 
-1. Import Necessary Modules: Your script must import unittest and the class/functions from the module temp_subject_for_test.
-    - Example for a class: from temp_subject_for_test import {class_name}
-    - Example for a standalone function: from temp_subject_for_test import {func_name}
+1. Import Necessary Modules: Your script must import unittest and the class/functions from the module `{module_import_path}`.
+    - Example for a class: from {module_import_path} import {class_name}
+    - Example for a standalone function: from {module_import_path} import {func_name}
     - If the code to be tested depends on other classes (like User from com.example.model.User), you MUST import them as well. The AI should infer these from the provided Python code. For example: from com.example.model.User import User.
 2. Create a Test Class: Define a class that inherits from unittest.TestCase.
 3. Write Test Methods: Inside the test class, write one or more test methods (names starting with test_).
@@ -983,9 +990,7 @@ Requirements:
 """
         temp_test_filename = None
         try:
-            # --- NEW: Write the code being tested to the temporary file ---
-            with open(temp_subject_filename, "w", encoding="utf-8") as f:
-                f.write(test_subject_code)
+            # --- The temporary subject file is no longer needed ---
 
             response = model.generate_content(test_generation_prompt)
             raw_test_code = response.text.strip()
@@ -1040,9 +1045,7 @@ Requirements:
         finally:
             if temp_test_filename and os.path.exists(temp_test_filename):
                 os.remove(temp_test_filename)
-            # --- NEW: Clean up the temporary subject file ---
-            if os.path.exists(temp_subject_filename):
-                os.remove(temp_subject_filename)
+            # --- No longer need to clean up the temporary subject file ---
         
         return overall_success
         
@@ -1300,13 +1303,14 @@ Expected Output: A single, valid JSON object representing the Python AST.
         log_file_handle.write(f"## ERROR: Could not save the generated Python file: {e}\n")
         return False
         
-def main(input_path, is_web_request=False):
+def main(input_path, output_root_dir_override=None):
     """
     Main function to orchestrate the translation process.
     Can be run from CLI or called by the web app.
-    Handles both single file and directory inputs.
+    If output_root_dir_override is provided, it will be used as the output path.
     """
-    if not is_web_request:
+    # This check is for when running directly from the command line
+    if output_root_dir_override is None:
         parser = argparse.ArgumentParser(
             description="Translate a Java file or project directory to Python using Generative AI."
         )
@@ -1320,14 +1324,19 @@ def main(input_path, is_web_request=False):
     if not os.path.exists(input_path):
         error_message = f"Error: The path '{input_path}' does not exist."
         print(error_message)
-        return (None, None, error_message) if is_web_request else exit(1)
+        # For web requests, we now return a value
+        if output_root_dir_override is not None:
+            return None, None, error_message
+        exit(1)
 
     # --- API and Model Setup ---
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
         error_message = "Erro Crítico: A variável de ambiente GOOGLE_API_KEY não está definida."
         print(error_message)
-        return (None, None, error_message) if is_web_request else exit(1)
+        if output_root_dir_override is not None:
+            return None, None, error_message
+        exit(1)
 
     try:
         genai.configure(api_key=api_key)
@@ -1349,20 +1358,23 @@ def main(input_path, is_web_request=False):
     except Exception as e:
         error_message = f"Erro Crítico ao inicializar o modelo Gemini: {e}"
         print(error_message)
-        return (None, None, error_message) if is_web_request else exit(1)
+        if output_root_dir_override is not None:
+            return None, None, error_message
+        exit(1)
 
     # --- Identify files to process ---
     java_files_to_process = []
-    # --- MODIFIED: The input_path is now the true root for both files and dirs ---
     input_root_path = os.path.abspath(input_path if os.path.isdir(input_path) else os.path.dirname(input_path))
 
     if os.path.isfile(input_path):
         if input_path.endswith(".java"):
             java_files_to_process.append(input_path)
         else:
-            error_message = f"Error: Input file '{input_path}' is not a valid .java or .zip file."
+            # This case is handled by web_app.py, but good for CLI robustness
+            error_message = f"Error: Input file '{input_path}' is not a .java file."
             print(error_message)
-            return (None, None, error_message) if is_web_request else exit(1)
+            if output_root_dir_override is not None: return None, None, error_message
+            exit(1)
     elif os.path.isdir(input_path):
         for root, _, files in os.walk(input_root_path):
             for file in files:
@@ -1372,20 +1384,26 @@ def main(input_path, is_web_request=False):
     if not java_files_to_process:
         error_message = f"No .java files found in '{input_path}'."
         print(error_message)
-        return (None, None, error_message) if is_web_request else exit(0)
+        if output_root_dir_override is not None: return None, None, error_message
+        exit(0)
 
     # --- Setup Output Directory and Log File ---
     base_name = os.path.basename(os.path.normpath(input_path))
-    if is_web_request:
-        # The web app now controls the full output path structure
-        output_root_dir = input_path.replace("uploads", "outputs", 1)
-        base_name = "project" # Use a generic name for the log file
+    
+    # MODIFIED: Use the override if it exists, otherwise calculate the path
+    if output_root_dir_override is not None:
+        output_root_dir = output_root_dir_override
+        # For projects, the input is a dir like 'source', so use a generic log name
+        if os.path.isdir(input_path):
+            base_name = "project"
     else:
+        # This is the original logic for CLI usage
+        if os.path.isfile(input_path):
+             base_name = os.path.splitext(base_name)[0]
         output_root_dir = f"{base_name}_translated"
 
     os.makedirs(output_root_dir, exist_ok=True)
     output_root_dir = os.path.abspath(output_root_dir)
-
     log_filename = os.path.join(output_root_dir, f"{base_name}_translation_log.md")
 
     print(f"\nFound {len(java_files_to_process)} Java file(s). Starting translation...")
@@ -1395,7 +1413,7 @@ def main(input_path, is_web_request=False):
     # --- Process all files ---
     successful_translations = 0
     with open(log_filename, "w", encoding="utf-8") as log_file:
-        log_file.write(f"# Translation Log for: `{input_path}`\n")
+        log_file.write(f"# Translation Log for: `{base_name}`\n")
         log_file.write(f"Model: `{GEMINI_MODEL_NAME}`\n")
         for i, java_file in enumerate(java_files_to_process):
             print(f"\n[{i+1}/{len(java_files_to_process)}] ", end="")
@@ -1406,8 +1424,8 @@ def main(input_path, is_web_request=False):
     print(f"Successfully translated: {successful_translations}/{len(java_files_to_process)} files.")
     print(f"Full results and logs are in the '{output_root_dir}' directory.")
 
-    # --- MODIFIED: Return the output directory for the web app ---
-    if is_web_request:
+    # Return paths for the web app to use
+    if output_root_dir_override is not None:
         return output_root_dir, log_filename, None
 
     print("Script finished.")

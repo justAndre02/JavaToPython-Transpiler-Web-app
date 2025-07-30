@@ -85,6 +85,9 @@
                     <div class="result-box">
                         <h2>Translation Log</h2>
                         <pre>{{ log_content }}</pre>
+                        <div class="actions">
+                            <a href="{{ url_for('download_file', type='log', request_id=request_id) }}" class="button">Download Log File</a>
+                        </div>
                     </div>
                 </div>
             {% endif %}

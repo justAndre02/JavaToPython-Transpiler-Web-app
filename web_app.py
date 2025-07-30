@@ -4,6 +4,7 @@ import os
 import uuid
 import zipfile
 import shutil
+from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, send_from_directory, flash, jsonify
 from werkzeug.utils import secure_filename
 
@@ -23,12 +24,10 @@ os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 def allowed_file(filename, allowed_extensions):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extensions
 
-# --- CORRECTED zip_directory function for cleaner archives ---
 def zip_directory(path, zip_handle):
     """Zips the contents of a directory without including the top-level folder."""
     for root, _, files in os.walk(path):
         for file in files:
-            # Create a relative path for files to avoid including the full system path
             relative_path = os.path.relpath(os.path.join(root, file), path)
             zip_handle.write(os.path.join(root, file), relative_path)
 
@@ -39,8 +38,7 @@ def index():
 @app.route('/transpile', methods=['POST'])
 def transpile_file():
     form_type = request.form.get('form_type')
-    request_id = str(uuid.uuid4())
-    # The root directory for all generated content for this request
+    request_id = datetime.now().strftime('%Y-%m-%d_%H-%M-%S-%f')
     output_dir_for_request = os.path.join(app.config['OUTPUT_FOLDER'], request_id)
     upload_dir_for_request = os.path.join(app.config['UPLOAD_FOLDER'], request_id)
     os.makedirs(output_dir_for_request, exist_ok=True)
@@ -55,6 +53,7 @@ def transpile_file():
             flash('Invalid form submission.')
             return redirect(url_for('index'))
     except Exception as e:
+        # Clean up on any failure
         shutil.rmtree(upload_dir_for_request)
         shutil.rmtree(output_dir_for_request)
         error_message = f"An unexpected error occurred: {str(e)}"
@@ -67,19 +66,17 @@ def handle_single_file_upload(req, request_id, upload_dir, output_dir):
         return redirect(url_for('index'))
 
     if allowed_file(file.filename, {'java'}):
-        # We pass the output_dir to the translation function now
-        filename = "Source.java"
+        filename = "Source.java"  # Using a generic name for the input
         file_path = os.path.join(upload_dir, filename)
         file.save(file_path)
 
-        # The run_translation function will now place its output in our designated 'output_dir'
-        translation_result = run_translation(file_path, output_dir)
+        # MODIFIED: Correctly call run_translation with the override argument
+        translation_result = run_translation(file_path, output_root_dir_override=output_dir)
         if translation_result is None:
             return render_template('result.html', error="Translation failed to produce a result.")
+        
         _, log_path, error = translation_result
-        # Note: The 'output_py_path' is now relative to the known output_dir
-        output_py_path = os.path.join(output_dir, "Source.py")
-
+        output_py_path = os.path.join(output_dir, "Source.py") # The output file name is now predictable
 
         if error:
             return render_template('result.html', error=error)
@@ -119,16 +116,16 @@ def handle_project_upload(req, request_id, upload_dir, output_dir):
         except zipfile.BadZipFile:
             return render_template('result.html', error="The uploaded file is not a valid ZIP archive.")
 
-        # Let the transpiler work directly into our clean output directory
-        translation_result = run_translation(extracted_dir, output_dir)
+        # MODIFIED: Correctly call run_translation with the override argument
+        translation_result = run_translation(extracted_dir, output_root_dir_override=output_dir)
         if translation_result is None:
             return render_template('result.html', error="Translation failed to produce a result.")
+        
         output_project_dir, log_path, error = translation_result
 
         if error:
             return render_template('result.html', error=error)
 
-        # Define the path for the output zip file
         output_zip_path = os.path.join(output_dir, 'translated_project.zip')
         with zipfile.ZipFile(output_zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             zip_directory(output_project_dir, zipf)
@@ -160,18 +157,14 @@ def get_directory_structure(root_dir):
         for part in path_parts:
             current_level = current_level.setdefault(part, {})
         for f in files:
-            # We don't want to show the zip file in the file tree
             if not f.endswith('.zip'):
                 current_level[f] = None
     return tree
 
-# --- CORRECTED download_file function ---
 @app.route('/download/<string:request_id>/<string:type>')
 def download_file(request_id, type):
-    # All outputs for a request are now in one predictable directory
     output_dir = os.path.join(app.config['OUTPUT_FOLDER'], request_id)
     filename = None
-
     if type == 'single_code':
         filename = next((f for f in os.listdir(output_dir) if f.endswith('.py')), None)
     elif type == 'project_zip':
@@ -188,16 +181,13 @@ def download_file(request_id, type):
         flash('File not found or has been cleaned up.')
         return redirect('/')
 
-# --- CORRECTED view_file function ---
 @app.route('/view_file/<string:request_id>')
 def view_file(request_id):
     file_path_rel = request.args.get('path')
     if not file_path_rel:
         return jsonify({"error": "No file path provided"}), 400
     
-    # The base directory for all translated files is now simple and correct
     base_output_dir = os.path.join(app.config['OUTPUT_FOLDER'], request_id)
-    
     full_path = os.path.abspath(os.path.join(base_output_dir, file_path_rel))
     
     if not full_path.startswith(os.path.abspath(base_output_dir)):
@@ -213,4 +203,6 @@ def view_file(request_id):
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Add extra_files=None and exclude_patterns to prevent the reloader
+    # from triggering on temp file creation in the outputs/uploads directories.
+    app.run(debug=True, use_reloader=True, extra_files=None, exclude_patterns=['*.pyc', '*/outputs/*', '*/uploads/*'])
