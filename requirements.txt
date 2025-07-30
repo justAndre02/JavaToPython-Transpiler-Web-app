@@ -1,0 +1,5 @@
+# File: requirements.txt
+Flask
+google-generativeai
+# The 'java-parser' library is a local dependency, so it's not listed here.
+# Ensure it's available in your Python environment.

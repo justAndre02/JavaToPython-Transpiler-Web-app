@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Java to Python Transpiler</title>
+    <style>
+        body { font-family: sans-serif; background-color: #f4f4f9; color: #333; line-height: 1.6; }
+        .container { max-width: 600px; margin: 50px auto; padding: 30px; background: #fff; border-radius: 8px; box-shadow: 0 0 15px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #444; }
+        .upload-form { display: flex; flex-direction: column; align-items: center; }
+        input[type="file"] { border: 1px solid #ddd; padding: 10px; border-radius: 5px; margin-bottom: 20px; width: 100%; }
+        button { background-color: #007bff; color: white; padding: 12px 25px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; transition: background-color 0.3s; margin-top: 10px; }
+        button:hover { background-color: #0056b3; }
+        .loading { display: none; text-align: center; font-size: 18px; color: #555; }
+        .choice-container { margin-bottom: 20px; text-align: center; }
+        .choice-container label { margin: 0 15px; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Java to Python AST Transpiler</h1>
+        
+        <!-- NEW: Radio buttons to choose input type -->
+        <div class="choice-container">
+            <label>
+                <input type="radio" name="upload_type" value="file" checked> Single File
+            </label>
+            <label>
+                <input type="radio" name="upload_type" value="project"> Project (.zip)
+            </label>
+        </div>
+
+        <!-- Single File Form -->
+        <form id="file-form" class="upload-form" action="/transpile" method="post" enctype="multipart/form-data">
+            <input type="hidden" name="form_type" value="file">
+            <label for="java_file">Select a .java file to transpile:</label>
+            <input type="file" name="java_file" id="java_file" accept=".java" required>
+            <button type="submit">Transpile File</button>
+        </form>
+
+        <!-- Project ZIP Form (initially hidden) -->
+        <form id="project-form" class="upload-form" action="/transpile" method="post" enctype="multipart/form-data" style="display:none;">
+            <input type="hidden" name="form_type" value="project">
+            <label for="project_file">Select a .zip file containing your Java project:</label>
+            <input type="file" name="project_file" id="project_file" accept=".zip" required>
+            <button type="submit">Transpile Project</button>
+        </form>
+
+        <div id="loading-message" class="loading">
+            <p>Processing... This may take a moment.</p>
+        </div>
+    </div>
+
+    <script>
+        const fileForm = document.getElementById('file-form');
+        const projectForm = document.getElementById('project-form');
+        const loadingMessage = document.getElementById('loading-message');
+
+        // Function to show the loading message and hide forms
+        function showLoading() {
+            fileForm.style.display = 'none';
+            projectForm.style.display = 'none';
+            loadingMessage.style.display = 'block';
+        }
+        
+        // Add submit listeners to both forms
+        fileForm.addEventListener('submit', showLoading);
+        projectForm.addEventListener('submit', showLoading);
+
+        // Add event listeners to radio buttons to toggle form visibility
+        document.querySelectorAll('input[name="upload_type"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                if (this.value === 'file') {
+                    fileForm.style.display = 'flex';
+                    projectForm.style.display = 'none';
+                } else {
+                    fileForm.style.display = 'none';
+                    projectForm.style.display = 'flex';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
