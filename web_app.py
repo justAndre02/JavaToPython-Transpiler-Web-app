@@ -153,15 +153,26 @@ def get_directory_structure(root_dir):
     tree = {}
     if not os.path.isdir(root_dir):
         return tree
-    for root, _, files in os.walk(root_dir):
+    
+    # Walk through the directory tree
+    for root, dirs, files in os.walk(root_dir):
+        # *** MODIFICATION: Exclude '__pycache__' directories from being processed ***
+        dirs[:] = [d for d in dirs if d != '__pycache__']
+        
         path_parts = os.path.relpath(root, root_dir).split(os.sep)
         if path_parts == ['.']: path_parts = []
+        
         current_level = tree
         for part in path_parts:
             current_level = current_level.setdefault(part, {})
+        
         for f in files:
-            if not f.endswith('.zip'):
-                current_level[f] = None
+            # Also exclude compiled python files and the zip archive itself
+            if not f.endswith('.zip') and not f.endswith('.pyc'):
+                file_path = os.path.join(root, f)
+                # Check if the file is not empty
+                has_content = os.path.getsize(file_path) > 0
+                current_level[f] = has_content
     return tree
 
 @app.route('/download/<string:request_id>/<string:type>')

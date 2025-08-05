@@ -24,7 +24,7 @@ except ImportError:
 
 # --- Configuração ---
 GEMINI_MODEL_NAME = "gemini-2.5-flash" # Using a modern, capable model
-MAX_MEMBERS_PER_CHUNK = 20 # Adjusted for potentially larger files
+MAX_MEMBERS_PER_CHUNK = 30 # Adjusted for potentially larger files
 
 # --- Framework Identification Helpers ---
 def find_nodes_by_type(node, node_type):
@@ -170,9 +170,8 @@ def identify_and_map_framework(ast_dict, file_path, project_root):
     return framework_metadata
 
 
-# --- Helper function to convert JSON dictionary to ast.AST object (UNCHANGED) ---
+# --- Helper function to convert JSON dictionary to ast.AST object ---
 def dict_to_ast_node(node_dict):
-    # ... (This function remains unchanged)
     if not isinstance(node_dict, dict):
         raise TypeError(f"Expected a dictionary for AST node, got {type(node_dict)} with value {node_dict}")
     node_type_name = node_dict.get("_nodetype") or node_dict.get("type")
@@ -195,7 +194,7 @@ def dict_to_ast_node(node_dict):
     known_list_fields = {
         "bases", "keywords", "body", "decorator_list", "args", "posonlyargs", 
         "kwonlyargs", "kw_defaults", "defaults", "names", "elts", "keys", 
-        "values", "handlers", "items", "type_ignores", "ops", "comparators", "orelse"
+        "values", "handlers", "items", "type_ignores", "ops", "orelse"
     }
     for field_name in node_class._fields:
         if field_name in node_dict:
@@ -203,7 +202,20 @@ def dict_to_ast_node(node_dict):
             if json_value is None:
                 constructor_args[field_name] = [] if field_name in known_list_fields else None
             elif isinstance(json_value, list):
-                constructor_args[field_name] = [dict_to_ast_node(item) if isinstance(item, dict) else item for item in json_value]
+                # --- MODIFICATION START ---
+                # Check for malformed list items (like keyword or withitem) that are missing their 'type'
+                processed_list = []
+                for item in json_value:
+                    if isinstance(item, dict):
+                        # Heuristically fix common malformations from the AI
+                        if 'arg' in item and 'value' in item and 'type' not in item and '_nodetype' not in item:
+                            item['type'] = 'keyword' # Likely a keyword argument
+                        elif 'context_expr' in item and 'optional_vars' in item and 'type' not in item and '_nodetype' not in item:
+                            item['type'] = 'withitem' # Likely a withitem for a 'with' statement
+                        processed_list.append(dict_to_ast_node(item))
+                    else:
+                        processed_list.append(item)
+                constructor_args[field_name] = processed_list
             elif isinstance(json_value, dict):
                 constructor_args[field_name] = dict_to_ast_node(json_value)
             else:
@@ -943,38 +955,39 @@ def generate_and_run_unit_tests(model, all_python_module_body_parts, original_ja
 
     overall_success = True
     
-    # --- FIX: Temporarily save the code being tested so it can be imported ---
+    # --- FIX: Move the creation of the subject file outside the loop ---
     # The module to import from is now the actual module path, not a temp name
     relative_path_py = os.path.relpath(java_file_path, start=input_root_path)
     module_filename = os.path.splitext(relative_path_py)[0] + '.py'
-    temp_subject_filepath = os.path.join(output_root_dir, module_filename)
+    subject_filepath = os.path.join(output_root_dir, module_filename)
     
     # Ensure the directory exists
-    os.makedirs(os.path.dirname(temp_subject_filepath), exist_ok=True)
+    os.makedirs(os.path.dirname(subject_filepath), exist_ok=True)
 
     try:
-        with open(temp_subject_filepath, "w", encoding="utf-8") as f:
+        with open(subject_filepath, "w", encoding="utf-8") as f:
             f.write(test_subject_code)
     except Exception as e:
-        print(f"    ERROR: Could not write temporary subject file for testing. Skipping tests. {e}")
-        log_file_handle.write("### ERROR: Could not write temporary subject file for testing. Tests skipped.\n")
+        print(f"    ERROR: Could not write subject file for testing. Skipping tests. {e}")
+        log_file_handle.write("### ERROR: Could not write subject file for testing. Tests skipped.\n")
         return False
     # --- END FIX ---
 
-    for func_info in testable_functions:
-        func_name = func_info['name']
-        class_name = func_info['class_name']
-        qualified_name = f"{class_name}.{func_name}" if class_name else func_name
+    try:
+        for func_info in testable_functions:
+            func_name = func_info['name']
+            class_name = func_info['class_name']
+            qualified_name = f"{class_name}.{func_name}" if class_name else func_name
 
-        # The module to import from is now the actual module path, not a temp name
-        import_name = class_name if class_name else func_name
+            # The module to import from is now the actual module path, not a temp name
+            import_name = class_name if class_name else func_name
 
-        print(f"    - Creating tests for `{qualified_name}`...")
-        log_file_handle.write(f"### Testing `{qualified_name}`\n\n")
-        
-        temp_test_filename = None
-        # 3. Generate test code with AI
-        test_generation_prompt = f"""You are a senior Python Quality Assurance (QA) engineer. Your task is to write a complete, executable unit test script for a specific Python function.
+            print(f"    - Creating tests for `{qualified_name}`...")
+            log_file_handle.write(f"### Testing `{qualified_name}`\n\n")
+            
+            temp_test_filename = None
+            # 3. Generate test code with AI
+            test_generation_prompt = f"""You are a senior Python Quality Assurance (QA) engineer. Your task is to write a complete, executable unit test script for a specific Python function.
 **Context:**
 The function was translated from a Java project. The original Java code for the file is provided below to help you understand the function's intended behavior, edge cases, and expected outputs.
 
@@ -1004,83 +1017,85 @@ Requirements:
 6. Make it Executable: Include the standard if __name__ == '__main__': unittest.main() block so the script can be run directly.
 7. Output ONLY Python Code: Your entire response must be a single, valid, runnable Python script. Do not include any explanations, markdown formatting, or other text.
 """
-        temp_test_filename = None
-        try:
-            # --- The temporary subject file is no longer needed ---
+            temp_test_filename = None
+            try:
+                # --- The temporary subject file is no longer needed ---
 
-            response = model.generate_content(test_generation_prompt)
-            raw_test_code = response.text.strip()
-            
-            cleaned_test_code = raw_test_code
-            if cleaned_test_code.startswith("```python"):
-                cleaned_test_code = cleaned_test_code[len("```python"):].strip()
-            if cleaned_test_code.endswith("```"):
-                cleaned_test_code = cleaned_test_code[:-len("```")].strip()
-            
-            log_file_handle.write("**AI-Generated Test Script:**\n\n```python\n" + cleaned_test_code + "\n```\n\n")
+                response = model.generate_content(test_generation_prompt)
+                raw_test_code = response.text.strip()
+                
+                cleaned_test_code = raw_test_code
+                if cleaned_test_code.startswith("```python"):
+                    cleaned_test_code = cleaned_test_code[len("```python"):].strip()
+                if cleaned_test_code.endswith("```"):
+                    cleaned_test_code = cleaned_test_code[:-len("```")].strip()
+                
+                log_file_handle.write("**AI-Generated Test Script:**\n\n```python\n" + cleaned_test_code + "\n```\n\n")
 
-            # --- FIX: Sanitize the filename to be a valid Python module name ---
-            # Replace dots in the qualified name with underscores.
-            safe_qualified_name = qualified_name.replace('.', '_')
-            temp_test_filename = os.path.join(output_root_dir, f"temp_test_{safe_qualified_name}.py")
-            # --- END FIX ---
-            
-            with open(temp_test_filename, "w", encoding="utf-8") as f:
-                f.write(cleaned_test_code)
+                # --- FIX: Sanitize the filename to be a valid Python module name ---
+                # Replace dots in the qualified name with underscores.
+                safe_qualified_name = qualified_name.replace('.', '_')
+                temp_test_filename = os.path.join(output_root_dir, f"temp_test_{safe_qualified_name}.py")
+                # --- END FIX ---
+                
+                with open(temp_test_filename, "w", encoding="utf-8") as f:
+                    f.write(cleaned_test_code)
 
-            # --- MODIFIED: Use the new environment with the correct PYTHONPATH ---
-            # Calculate the Python source root for imports
-            python_source_root = get_python_source_root(java_file_path, input_root_path, output_root_dir, ast_dictionary)
-            
-            # Set up the environment for the subprocess
-            env = os.environ.copy()
-            
-            # --- FIX: Ensure the output directory is in PYTHONPATH ---
-            # This allows the test script to import the translated module.
-            output_dir_abs = os.path.abspath(output_root_dir)
-            if 'PYTHONPATH' in env:
-                env['PYTHONPATH'] = f"{output_dir_abs}{os.pathsep}{env['PYTHONPATH']}"
-            else:
-                env['PYTHONPATH'] = output_dir_abs
-            # --- END FIX ---
+                # --- MODIFIED: Use the new environment with the correct PYTHONPATH ---
+                # Calculate the Python source root for imports
+                python_source_root = get_python_source_root(java_file_path, input_root_path, output_root_dir, ast_dictionary)
+                
+                # Set up the environment for the subprocess
+                env = os.environ.copy()
+                
+                # --- FIX: Ensure the output directory is in PYTHONPATH ---
+                # This allows the test script to import the translated module.
+                output_dir_abs = os.path.abspath(output_root_dir)
+                if 'PYTHONPATH' in env:
+                    env['PYTHONPATH'] = f"{output_dir_abs}{os.pathsep}{env['PYTHONPATH']}"
+                else:
+                    env['PYTHONPATH'] = output_dir_abs
+                # --- END FIX ---
 
-            # --- FIX: Execute the specific test file directly instead of using discover ---
-            process = subprocess.run(
-                [sys.executable, "-m", "unittest", temp_test_filename],
-                capture_output=True,
-                text=True,
-                cwd=output_root_dir,
-                encoding='utf-8',
-                errors='replace',
-                env=env,
-                timeout=30
-            )
-            # --- END FIX ---
+                # --- FIX: Execute the specific test file directly instead of using discover ---
+                process = subprocess.run(
+                    [sys.executable, "-m", "unittest", temp_test_filename],
+                    capture_output=True,
+                    text=True,
+                    cwd=output_root_dir,
+                    encoding='utf-8',
+                    errors='replace',
+                    env=env,
+                    timeout=30
+                )
+                # --- END FIX ---
 
-            log_file_handle.write("**Test Execution Results:**\n\n")
-            if process.returncode == 0:
-                print(f"      ✅ PASS: Tests for `{qualified_name}` succeeded.")
-                log_file_handle.write("```\n✅ PASSED\n\n")
-                log_file_handle.write("Output:\n" + (process.stdout or process.stderr) + "\n```\n")
-            else:
-                print(f"      ❌ FAIL: Tests for `{qualified_name}` failed.")
-                log_file_handle.write("```\n❌ FAILED\n\n")
-                log_file_handle.write("Stderr:\n" + process.stderr + "\n")
-                log_file_handle.write("Stdout:\n" + process.stdout + "\n```\n")
+                log_file_handle.write("**Test Execution Results:**\n\n")
+                if process.returncode == 0:
+                    print(f"      ✅ PASS: Tests for `{qualified_name}` succeeded.")
+                    log_file_handle.write("```\n✅ PASSED\n\n")
+                    log_file_handle.write("Output:\n" + (process.stdout or process.stderr) + "\n```\n")
+                else:
+                    print(f"      ❌ FAIL: Tests for `{qualified_name}` failed.")
+                    log_file_handle.write("```\n❌ FAILED\n\n")
+                    log_file_handle.write("Stderr:\n" + process.stderr + "\n")
+                    log_file_handle.write("Stdout:\n" + process.stdout + "\n```\n")
+                    overall_success = False
+
+            except Exception as e:
+                print(f"    ERROR: Failed during test generation or execution for `{qualified_name}`: {e}")
+                traceback.print_exc()
+                log_file_handle.write(f"### ERROR during test generation/execution: {e}\n\n")
                 overall_success = False
+            finally:
+                if temp_test_filename and os.path.exists(temp_test_filename):
+                    os.remove(temp_test_filename)
 
-        except Exception as e:
-            print(f"    ERROR: Failed during test generation or execution for `{qualified_name}`: {e}")
-            traceback.print_exc()
-            log_file_handle.write(f"### ERROR during test generation/execution: {e}\n\n")
-            overall_success = False
-        finally:
-            if temp_test_filename and os.path.exists(temp_test_filename):
-                os.remove(temp_test_filename)
-            # --- FIX: Clean up the temporary subject file ---
-            if temp_subject_filepath and os.path.exists(temp_subject_filepath):
-                os.remove(temp_subject_filepath)
-            # --- END FIX ---
+    finally:
+        # --- FIX: Clean up the subject file after all tests for it are done ---
+        if subject_filepath and os.path.exists(subject_filepath):
+            os.remove(subject_filepath)
+        # --- END FIX ---
         
     return overall_success
         
