@@ -16,11 +16,12 @@ from ast import NodeVisitor
 # You'll need to ensure this import works in your environment.
 try:
     from java_parser.antlr_parser import generate_ast_dict
-except ImportError:
+except ImportError as e:
+    # ...existing code...
     print("Erro Crítico: java_parser.antlr_parser não encontrado.")
     print("Este script requer o parser ANTLR para gerar a AST do Java.")
     print("Por favor, certifique-se de que 'java_parser.antlr_parser' está acessível.")
-    exit()
+    raise  # raise instead of exit() so the Flask app can handle it
 
 # --- Configuração ---
 GEMINI_MODEL_NAME = "gemini-2.5-flash" # Using a modern, capable model

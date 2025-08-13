@@ -11,6 +11,12 @@ from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 load_dotenv()  # Load variables from a local .env if present
 
+# Ensure project root is on sys.path for imports in deployed environments
+import sys
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+
 from app_automated_ast_translation import main as run_translation
 
 app = Flask(__name__)
