@@ -8,15 +8,19 @@ from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, send_from_directory, flash, jsonify
 from werkzeug.utils import secure_filename
 
+from dotenv import load_dotenv
+load_dotenv()  # Load variables from a local .env if present
+
 from app_automated_ast_translation import main as run_translation
 
 app = Flask(__name__)
 
-UPLOAD_FOLDER = 'uploads'
-OUTPUT_FOLDER = 'outputs'
+UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', 'uploads')
+OUTPUT_FOLDER = os.environ.get('OUTPUT_FOLDER', 'outputs')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['OUTPUT_FOLDER'] = OUTPUT_FOLDER
-app.secret_key = 'super-secret-key-for-flash'
+app.secret_key = os.environ.get('SECRET_KEY', 'super-secret-key-for-flash')
+
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
@@ -37,6 +41,11 @@ def index():
 
 @app.route('/transpile', methods=['POST'])
 def transpile_file():
+    # Require API key before doing work
+    if not os.getenv('GOOGLE_API_KEY'):
+        flash('Missing GOOGLE_API_KEY. Get a key at https://aistudio.google.com/apikey and put it in a .env file: GOOGLE_API_KEY=your_key')
+        return redirect(url_for('index'))
+    
     form_type = request.form.get('form_type')
     request_id = datetime.now().strftime('%Y-%m-%d_%H-%M-%S-%f')
     output_dir_for_request = os.path.join(app.config['OUTPUT_FOLDER'], request_id)
@@ -219,4 +228,4 @@ def view_file(request_id):
 if __name__ == '__main__':
     # Add extra_files=None and exclude_patterns to prevent the reloader
     # from triggering on temp file creation in the outputs/uploads directories.
-    app.run(debug=True, use_reloader=True, extra_files=None, exclude_patterns=['*.pyc', '*/outputs/*', '*/uploads/*'])
+    app.run(host='0.0.0.0', debug=True, use_reloader=True, extra_files=None, exclude_patterns=['*.pyc', '*/outputs/*', '*/uploads/*'])
