@@ -195,7 +195,17 @@ def download_file(request_id, type):
     output_dir = os.path.join(app.config['OUTPUT_FOLDER'], request_id)
     filename = None
     if type == 'single_code':
-        filename = next((f for f in os.listdir(output_dir) if f.endswith('.py')), None)
+        # Prefer non-empty .py files and ignore __init__.py
+        py_files = [f for f in os.listdir(output_dir) if f.endswith('.py')]
+        py_files = [
+            f for f in py_files
+            if f != '__init__.py'
+            and os.path.isfile(os.path.join(output_dir, f))
+            and os.path.getsize(os.path.join(output_dir, f)) > 0
+        ]
+        if py_files:
+            # Choose the most recently modified .py file deterministically
+            filename = max(py_files, key=lambda f: os.path.getmtime(os.path.join(output_dir, f)))
     elif type == 'project_zip':
         filename = 'translated_project.zip'
     elif type == 'log':
