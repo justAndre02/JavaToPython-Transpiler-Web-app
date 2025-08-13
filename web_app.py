@@ -234,4 +234,4 @@ def view_file(request_id):
 if __name__ == '__main__':
     # Add extra_files=None and exclude_patterns to prevent the reloader
     # from triggering on temp file creation in the outputs/uploads directories.
-    app.run(host='0.0.0.0', debug=True, use_reloader=True, extra_files=None, exclude_patterns=['*.pyc', '*/outputs/*', '*/uploads/*'])
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 10000)), debug=False, use_reloader=False, extra_files=None, exclude_patterns=['*.pyc', '*/outputs/*', '*/uploads/*'])
