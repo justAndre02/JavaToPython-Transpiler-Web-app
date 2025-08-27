@@ -15,3 +15,7 @@ This is a tool that allows users to transpile one file or a whole project in Jav
 
 ## If you only whish to try the application online
 Simply acess the web app created at http://207.154.252.171 and enjoy
+
+# Relate Work
+If this project interests you I humbly suggest acessing this landing page that contains o document written about the application and another article published about the same topic:
+http://www.java.2.python.pt/
