@@ -15,6 +15,11 @@
     }
     *{box-sizing:border-box}
     html,body{height:100%;margin:0;font-family:Montserrat,system-ui,-apple-system,"Segoe UI",Roboto,Arial;background:var(--bg);color:#222}
+    body{
+      display:flex;
+      flex-direction:column;
+      min-height:100vh;
+    }
     header {
       background: linear-gradient(90deg,var(--maroon) 0%,var(--orange) 100%);
       color: white;
@@ -46,7 +51,7 @@
       text-align: center;
     }
     .site-title{font-weight:700;font-size:20px}
-    main{display:flex;align-items:center;justify-content:center;padding:48px 16px}
+    main{display:flex;align-items:center;justify-content:center;padding:48px 16px;flex:1 0 auto}
     .card{width:100%;max-width:980px;background:var(--card);border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,0.06);padding:34px}
     .hero {
       display: flex;
@@ -82,6 +87,23 @@
     .btn-secondary{background:transparent;border:2px solid var(--maroon);color:var(--maroon)}
     .btn-alt{background:var(--orange);color:white}
     .small{font-size:13px;color:var(--muted)}
+    footer{
+      margin-top:auto;
+      background:#d9dadf;
+      color:#333;
+      padding:24px 16px;
+      text-align:center;
+      font-size:14px;
+    }
+    footer strong{
+      display:block;
+      margin-bottom:12px;
+    }
+    footer .contacts{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
   </style>
 </head>
 <body>
@@ -111,7 +133,6 @@
           <p class="lead">Visualiza o documento escrito. Podes também descarregar o documento usando os controlos do visualizador.</p>
 
           <div class="embed-wrap">
-            <!-- Para incorporar um ficheiro do Google Drive usa-se /preview em vez de /view 
             <iframe class="doc" src="resource/Tese.pdf" title="Documento da tese"></iframe>
           </div>
         </div> -->
@@ -130,6 +151,14 @@
     </div>
   </main>
 
+  <footer>
+    <strong>Contactos dos colaboradores</strong>
+    <div class="contacts">
+      <span>André Freitas — <a href="mailto:andre.filipe.araujo.freitas@gmail.com">andre.filipe.araujo.freitas@gmail.com</a></span>
+      <span>Tiago Baptista — <a href="mailto:tiago96baptista@gmail.com">tiago96baptista@gmail.com</a></span>
+      <span>Pedro Rangel Henriques — <a href="mailto:pedrorangelhenriques@gmail.com">pedrorangelhenriques@gmail.com</a></span>
+    </div>
+  </footer>
 </body>
 </html>
 
