@@ -24,8 +24,8 @@ except ImportError as e:
     raise  # raise instead of exit() so the Flask app can handle it
 
 # --- Configuração ---
-GEMINI_MODEL_NAME = "gemini-2.5-flash" # Using a modern, capable model
-MAX_MEMBERS_PER_CHUNK = 30 # Adjusted for potentially larger files
+GEMINI_MODEL_NAME = "gemini-3-flash-preview" # Using a modern, capable model
+MAX_MEMBERS_PER_CHUNK = 20 # Adjusted for potentially larger files
 
 # --- Framework Identification Helpers ---
 def find_nodes_by_type(node, node_type):
