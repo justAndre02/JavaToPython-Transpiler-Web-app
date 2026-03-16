@@ -1216,16 +1216,21 @@ Expected Output: A single, valid JSON object representing the Python AST.
         return False
 
     # --- MODIFIED: Pass necessary context to the test generator ---
-    tests_passed = generate_and_run_unit_tests(
-        model, 
-        all_python_module_body_parts, 
-        original_java_code_content, 
-        log_file_handle,
-        output_root_dir,
-        java_file_path,
-        input_root_path,
-        ast_dictionary
-    )
+    try:
+        tests_passed = generate_and_run_unit_tests(
+            model,
+            all_python_module_body_parts,
+            original_java_code_content,
+            log_file_handle,
+            output_root_dir,
+            java_file_path,
+            input_root_path,
+            ast_dictionary
+        )
+    except Exception as e:
+        print(f"  WARNING: Unit test generation raised an unexpected error: {e}. Continuing with translation.")
+        log_file_handle.write(f"### WARNING: Unit test generation raised an error: {e}. Continuing.\n\n")
+        tests_passed = False
     if tests_passed:
         log_file_handle.write("\n**Overall Test Result: ✅ All generated tests passed.**\n")
     else:
@@ -1477,6 +1482,9 @@ def main(input_path, output_root_dir_override=None):
 
     # Return paths for the web app to use
     if output_root_dir_override is not None:
+        if successful_translations == 0:
+            error_message = f"Translation failed: 0 of {len(java_files_to_process)} file(s) were translated successfully. Check the log for details."
+            return output_root_dir, log_filename, error_message
         return output_root_dir, log_filename, None
 
     print("Script finished.")

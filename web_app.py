@@ -97,8 +97,21 @@ def handle_single_file_upload(req, request_id, upload_dir, output_dir):
         output_py_path = os.path.join(output_dir, f"{base_filename}.py")
 
         if error:
-            return render_template('result.html', error=error)
-        
+            log_content = ""
+            if log_path and os.path.exists(log_path):
+                with open(log_path, 'r', encoding='utf-8') as f:
+                    log_content = f.read()
+            return render_template('result.html', error=error, log_content=log_content)
+
+        if not os.path.exists(output_py_path):
+            log_content = ""
+            if log_path and os.path.exists(log_path):
+                with open(log_path, 'r', encoding='utf-8') as f:
+                    log_content = f.read()
+            return render_template('result.html',
+                                   error="Translation failed: the output file was not created. Check the log below for details.",
+                                   log_content=log_content)
+
         with open(output_py_path, 'r', encoding='utf-8') as f:
             python_code = f.read()
         
@@ -142,7 +155,11 @@ def handle_project_upload(req, request_id, upload_dir, output_dir):
         output_project_dir, log_path, error = translation_result
 
         if error:
-            return render_template('result.html', error=error)
+            log_content = ""
+            if log_path and os.path.exists(log_path):
+                with open(log_path, 'r', encoding='utf-8') as f:
+                    log_content = f.read()
+            return render_template('result.html', error=error, log_content=log_content)
 
         output_zip_path = os.path.join(output_dir, 'translated_project.zip')
         with zipfile.ZipFile(output_zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
