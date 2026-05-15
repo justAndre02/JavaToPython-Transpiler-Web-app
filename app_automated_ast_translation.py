@@ -1396,21 +1396,26 @@ def main(input_path, output_root_dir_override=None):
         exit(1)
 
     try:
-        genai.configure(api_key=api_key)
-        # ... (rest of the model setup is identical)
-        generation_config = genai.GenerationConfig(temperature=0.4)
-        safety_settings = [
-            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-        ]
-        model = genai.GenerativeModel(
-            model_name=GEMINI_MODEL_NAME,
-            generation_config=generation_config,
-            safety_settings=safety_settings,
+        client = genai.Client(api_key=api_key)
+        config = types.GenerateContentConfig(
+            temperature=0.5,
             system_instruction=system_message,
         )
+        
+        class ModelWrapper:
+            def __init__(self, client, model_name, config):
+                self.client = client
+                self.model_name = model_name
+                self.config = config
+            
+            def generate_content(self, contents):
+                return self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=contents,
+                    config=self.config
+                )
+                
+        model = ModelWrapper(client, GEMINI_MODEL_NAME, config)
         print(f"Successfully initialized Gemini model: {GEMINI_MODEL_NAME}")
     except Exception as e:
         error_message = f"Erro Crítico ao inicializar o modelo Gemini: {e}"
