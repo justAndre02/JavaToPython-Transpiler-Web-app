@@ -1,6 +1,7 @@
 import json
 import os
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import ast
 import traceback # For more detailed error logging
 import copy # Added for deep copying AST nodes
@@ -24,7 +25,7 @@ except ImportError as e:
     raise  # raise instead of exit() so the Flask app can handle it
 
 # --- Configuração ---
-GEMINI_MODEL_NAME = "gemini-3.1-flash-lite-preview" # Using a modern, capable model
+GEMINI_MODEL_NAME = "gemini-3.1-flash-lite" # Using a modern, capable model
 MAX_MEMBERS_PER_CHUNK = 20 # Adjusted for potentially larger files
 
 # --- Framework Identification Helpers ---
